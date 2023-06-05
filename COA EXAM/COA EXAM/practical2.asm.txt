@@ -1,0 +1,148 @@
+%macro WRITE 02
+mov rax,1
+mov rdi,1
+mov rsi,%1
+mov rdx,%2
+syscall
+%endmacro
+
+%macro READ 02
+mov rax,0
+mov rdi,0
+mov rsi,%1
+mov rdx,%2
+syscall
+%endmacro
+
+section .data
+
+menu    db 10, "***menu***",10
+        db 10, "1) BCD TO HEX",10
+        db 10, "2) HEX TO BCD",10
+        db 10, "3) EXIT",10
+        db 10, "Enter your choice",10
+menulen equ $-menu
+msg1 db "enter number to be converted from bcd to hex:",10
+len1 equ $-msg1
+msg2 db "enter number to be converted from hex to bcd:",10
+len2 equ $-msg2
+msg3 db "Answer is:",10
+len3 equ $-msg3
+msg8 db "Wrong choice, choose again :",10
+len8 equ $-msg8
+
+section .bss
+ans resq 1
+cnt resb 1
+x resb 1
+actl resq 1
+choice resb 2
+char_buff resb 17
+
+section .text
+global _start
+_start:
+
+menumsg:WRITE menu,menulen                 ;menu
+        READ choice,02
+
+cmp byte[choice],31H                  ;menu driven
+je bcdtohex
+cmp byte[choice],32H
+je hextobcd
+cmp byte[choice],33H
+je exit
+WRITE msg8,len8
+JMP menumsg
+
+bcdtohex: WRITE msg1,len1
+READ char_buff,17
+dec rax
+mov [actl],rax
+mov rax,00
+mov rsi, char_buff
+mov rbx,0AH
+up: mul rbx
+mov rdx,00
+mov dl, byte[rsi]
+sub dl,30H
+add rax,rdx
+inc rsi
+dec qword[actl]
+jnz up
+mov [ans],rax
+WRITE msg3,len3
+mov rbx,[ans]
+call display
+JMP _start
+
+hextobcd:WRITE msg2, len2
+READ char_buff,17
+call accept
+mov byte[cnt],00
+mov rax,rbx
+up1:mov rdx,00
+mov rbx,0AH
+
+div rbx
+
+push rdx
+inc byte[cnt]
+cmp rax,00
+jne up1
+
+WRITE msg3,len3
+
+up2: pop rdx
+add dl,30H
+mov byte[x],dl
+WRITE x , 01
+dec byte[cnt]
+jnz up2
+JMP _start
+
+
+JMP menumsg
+
+
+exit:   mov rax,60;
+        mov rdi,0
+        syscall
+
+accept: dec rax
+        mov [actl],rax
+
+        mov rbx,0
+        mov rsi,char_buff
+
+        up3:shl rbx,04H
+        mov rdx,0
+        mov dl, byte[rsi]
+        cmp dl,39H
+        jbe sub30
+        sub dl,07H
+
+        sub30:  sub dl,30H
+        add rbx,rdx
+        inc rsi
+        dec qword[actl]
+        jnz up3
+ret
+
+display:mov rsi,char_buff
+        mov rcx,16
+        up4:rol rbx,04
+        mov dl,bl
+        and dl,0FH
+        cmp dl,09H
+        jbe add30
+
+        add dl,07H
+        add30:add dl,30H
+        mov byte[rsi],dl
+        inc rsi
+        dec rcx
+        jnz up4
+
+        WRITE char_buff,16
+ret
